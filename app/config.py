@@ -11,8 +11,10 @@ STORED_BLOCKS_DIR = os.getenv("STORED_BLOCKS_DIR", "stored_blocks")
 GLOBAL_SUMMARY_FILE = os.getenv("GLOBAL_SUMMARY_FILE", "global_summary.txt")
 
 # === OpenAI / LLM ===
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
 MODEL_NAME = os.getenv("MODEL_NAME")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 
 # === Embeddings / FAISS ===
 MAX_BLOCKS_PER_FILE = int(os.getenv("MAX_BLOCKS_PER_FILE", 10))
