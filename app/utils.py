@@ -1,7 +1,10 @@
-import zipfile, os, shutil, requests
+import zipfile
+import os
+import shutil
+import requests
 from fastapi import UploadFile
 
-from config import (
+from app.config import (
     STORED_BLOCKS_DIR,
     GLOBAL_SUMMARY_FILE,
     TMP_DIR,
@@ -19,7 +22,7 @@ async def extract_text_blocks(file: UploadFile, extensions=ALLOWED_EXTENSIONS):
         f.write(data)
 
     # Extract ZIP contents
-    with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
+    with zipfile.ZipFile(tmp_path, "r") as zip_ref:
         zip_ref.extractall(TMP_DIR)
 
     # Process all files with allowed extensions
@@ -64,8 +67,11 @@ def process_file(path, max_blocks=MAX_BLOCKS_PER_FILE):
     chunk_size = max(1, len(text) // max_blocks)
 
     # Create text blocks
-    blocks = [(path, text[i:i + chunk_size].strip()) for i in range(0, len(text), chunk_size) if
-              text[i:i + chunk_size].strip()]
+    blocks = [
+        (path, text[i : i + chunk_size].strip())
+        for i in range(0, len(text), chunk_size)
+        if text[i : i + chunk_size].strip()
+    ]
 
     return blocks
 
@@ -89,7 +95,7 @@ async def extract_github_repo(repo_url: str, extensions=ALLOWED_EXTENSIONS):
     """
     zip_urls = [
         repo_url.rstrip("/") + "/archive/refs/heads/main.zip",
-        repo_url.rstrip("/") + "/archive/refs/heads/master.zip"
+        repo_url.rstrip("/") + "/archive/refs/heads/master.zip",
     ]
 
     tmp_path = os.path.join("tmp", "github_repo.zip")
@@ -109,7 +115,7 @@ async def extract_github_repo(repo_url: str, extensions=ALLOWED_EXTENSIONS):
     os.makedirs(TMP_DIR, exist_ok=True)
 
     # Extract the ZIP file
-    with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
+    with zipfile.ZipFile(tmp_path, "r") as zip_ref:
         zip_ref.extractall(TMP_DIR)
 
     # Collect blocks from allowed files
