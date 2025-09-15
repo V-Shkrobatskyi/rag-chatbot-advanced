@@ -5,7 +5,7 @@ from typing import List, Tuple, Optional
 from app.services.indexer import build_faiss_index, search_blocks
 from app.services.loader import load_project_from_zip, load_project_from_github
 from app.utils import clear_stored_txt, save_blocks_to_txt
-from app.llm_utils import ask_openai
+from app.llm_utils import ask_llm
 from app.state import AppState
 
 router = APIRouter()
@@ -48,6 +48,7 @@ async def upload_github(request: Request, repo_url: str = Form(...)):
 
     try:
         raw_docs = await load_project_from_github(repo_url)
+        # Initialize documents: (path, text, summary=None)
         documents: List[Document] = [(path, text, None) for path, text in raw_docs]
     except Exception as e:
         return {"error": str(e)}
@@ -57,17 +58,25 @@ async def upload_github(request: Request, repo_url: str = Form(...)):
     state.documents = documents
     save_blocks_to_txt(state.documents)
 
-    # Generate summaries
-    combined_summary_text = ask_openai(
-        "Briefly summarize each block:\n\n" + "\n\n".join([b[1] for b in state.documents])
+    # 1. Generate summary for each block
+    combined_summary_text = ask_llm(
+        "Briefly summarize each block:\n\n" +
+        "\n\n".join([b[1] for b in state.documents])
     )
     summary_lines = [line.strip() for line in combined_summary_text.split("\n") if line.strip()]
 
-    state.documents = [(*doc, summary) for doc, summary in zip(state.documents, summary_lines)]
+    # If summary less than documents — extend with empty rows
+    if len(summary_lines) < len(state.documents):
+        summary_lines += [""] * (len(state.documents) - len(summary_lines))
 
-    state.global_summary = ask_openai(
+    # Update documents with summary
+    state.documents = [(*doc[:2], summary) for doc, summary in zip(state.documents, summary_lines)]
+
+    # 2. Generate global summary (only unempty summaries)
+    summaries = [d[2] for d in state.documents if d[2]]
+    state.global_summary = ask_llm(
         "Based on these summaries, create a global summary of the project:\n" +
-        "\n".join(d[2] for d in state.documents)
+        "\n".join(summaries)
     )
 
     return {
@@ -135,5 +144,5 @@ async def ask_question(request: Request, q: Question):
     )
 
     # 3. Generate answer using LLM
-    answer = ask_openai(f"Question: {q.user_question}\n\nContext:\n{context}")
+    answer = ask_llm(f"Question: {q.user_question}\n\nContext:\n{context}")
     return {"question": q.user_question, "answer": answer}

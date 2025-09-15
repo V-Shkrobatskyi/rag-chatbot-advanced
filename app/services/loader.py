@@ -1,11 +1,10 @@
 import os, requests, shutil, zipfile, numpy as np
 from typing import List, Tuple, Optional
-
 from fastapi import UploadFile
 
 from app.config import MAX_BLOCKS_PER_FILE, ALLOWED_EXTENSIONS, TMP_DIR
 from app.embeddings import get_embedding
-from app.llm_utils import ask_openai
+from app.llm_utils import ask_llm
 from app.services.indexer import build_faiss_index
 from app.utils import extract_text_blocks, save_blocks_to_txt, clear_stored_txt
 from app.state import AppState
@@ -42,21 +41,26 @@ async def load_project_from_zip(file: UploadFile, state: AppState, debug=False):
     if not debug:
         # Generate summaries for each block using LLM
         combined_text = "\n\n".join([b[1] for b in state.documents])
-        combined_summary_text = ask_openai(
+        combined_summary_text = ask_llm(
             f"Briefly (1-2 sentences) summarize each block below:\n\n{combined_text}"
         )
         summary_lines = [line.strip() for line in combined_summary_text.split("\n") if line.strip()]
 
+        # If LLM answer less — extend summary with empty rows
+        if len(summary_lines) < len(state.documents):
+            summary_lines += [""] * (len(state.documents) - len(summary_lines))
+
         # Add summary to documents
         state.documents = [
-            (*doc, summary)  # tuple = (path, text, summary)
+            (*doc[:2], summary)  # tuple = (path, text, summary)
             for doc, summary in zip(state.documents, summary_lines)
         ]
 
-        # Generate global project summary from block summaries
-        state.global_summary = ask_openai(
+        # Generate global project summary safely
+        non_empty_summaries = [d[2] for d in state.documents if d[2]]
+        state.global_summary = ask_llm(
             f"Based on these short summaries, create a global summary of the project:\n" +
-            "\n".join(d[2] for d in state.documents)
+            "\n".join(non_empty_summaries)
         )
 
     return state.documents
